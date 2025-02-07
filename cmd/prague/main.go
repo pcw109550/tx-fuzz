@@ -9,6 +9,7 @@ import (
 
 	txfuzz "github.com/MariusVanDerWijden/tx-fuzz"
 	"github.com/MariusVanDerWijden/tx-fuzz/helper"
+	"github.com/MariusVanDerWijden/tx-fuzz/spammer"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -258,8 +259,16 @@ func test7702() {
 		}
 		sk := crypto.ToECDSAUnsafe(common.FromHex(txfuzz.SK))
 		self, _ := types.SignAuth(unsigned, sk)
-		helper.ExecAuth(prec, []byte{0x01}, &types.AuthorizationList{self})
+		tx := helper.ExecAuth(prec, []byte{0x01}, &types.AuthorizationList{self})
+		helper.Wait(tx)
 	}
+	// Test out spam
+	for i := 0; i < 10; i++ {
+		go spam7702Calls(selfAddr)
+		go spam7702Calls(proxy)
+	}
+	tx := spam7702Calls(proxy)
+	helper.Wait(tx)
 }
 
 func do7702Calls(addr common.Address) {
@@ -293,6 +302,26 @@ func do7702Calls(addr common.Address) {
 		list = append(list, self)
 	}
 	helper.ExecAuth(addr, []byte{}, &list)
+}
+
+func spam7702Calls(addr common.Address) *types.Transaction {
+	// create authorizations
+	var auths types.AuthorizationList
+	for _, key := range spammer.StaticKeys {
+		sk := crypto.ToECDSAUnsafe(common.FromHex(key))
+		author := crypto.PubkeyToAddress(sk.PublicKey)
+		unsigned := &types.Authorization{
+			ChainID: helper.ChainID().Uint64(),
+			Address: addr,
+			Nonce:   helper.Nonce(author),
+		}
+		auth, err := types.SignAuth(unsigned, sk)
+		if err != nil {
+			panic(err)
+		}
+		auths = append(auths, auth)
+	}
+	return helper.ExecAuth(addr, []byte{0x01}, &auths)
 }
 
 // See: https://gist.github.com/lightclient/7742e84fde4962f32928c6177eda7523

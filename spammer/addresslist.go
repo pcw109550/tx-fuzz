@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	staticKeys = []string{
+	StaticKeys = []string{
 		"0xaf5ead4413ff4b78bc94191a2926ae9ccbec86ce099d65aaf469e9eb1a0fa87f",
 		"0xe63135ee5310c0b34c551e4683ad926dce90062b15e43275f9189b0f29bc784c",
 		"0xc216a7b5048e6ea2437b20bc9c7f9a57cc8aefd5aaf6a991c4db407218ed9e77",
