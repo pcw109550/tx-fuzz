@@ -6,7 +6,7 @@ toolchain go1.23.1
 
 require (
 	github.com/MariusVanDerWijden/FuzzyVM v0.0.0-20240516070431-7828990cad7d
-	github.com/ethereum/go-ethereum v1.14.8
+	github.com/ethereum/go-ethereum v1.15.0
 	github.com/holiman/goevmlab v0.0.0-20240515165425-8414a52dc9d4
 	github.com/urfave/cli/v2 v2.27.1
 )

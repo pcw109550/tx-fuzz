@@ -238,6 +238,31 @@ func makeTxWithValue(addr common.Address, value *big.Int, data []byte) *types.Tr
 }
 
 func test7702() {
+	proxy, err := deploy7702Proxy()
+	if err != nil {
+		panic(err)
+	}
+	do7702Calls(proxy)
+	selfAddr := common.HexToAddress(txfuzz.ADDR)
+	do7702Calls(selfAddr)
+
+	for i := 0; i < 18; i++ {
+		prec, err := deployPrecompileCaller(fmt.Sprintf("%02x", i))
+		if err != nil {
+			panic(err)
+		}
+		unsigned := &types.Authorization{
+			ChainID: helper.ChainID().Uint64(),
+			Address: selfAddr,
+			Nonce:   helper.Nonce(selfAddr),
+		}
+		sk := crypto.ToECDSAUnsafe(common.FromHex(txfuzz.SK))
+		self, _ := types.SignAuth(unsigned, sk)
+		helper.ExecAuth(prec, []byte{0x01}, &types.AuthorizationList{self})
+	}
+}
+
+func do7702Calls(addr common.Address) {
 	// authenticate self
 	selfAddr := common.HexToAddress(txfuzz.ADDR)
 	unsigned := &types.Authorization{
@@ -247,27 +272,33 @@ func test7702() {
 	}
 	sk := crypto.ToECDSAUnsafe(common.FromHex(txfuzz.SK))
 	self, _ := types.SignAuth(unsigned, sk)
-	helper.ExecAuth(selfAddr, []byte{}, &types.AuthorizationList{self})
+	helper.ExecAuth(addr, []byte{}, &types.AuthorizationList{self})
 	// authenticate self twice
-	helper.ExecAuth(selfAddr, []byte{}, &types.AuthorizationList{self, self})
+	helper.ExecAuth(addr, []byte{}, &types.AuthorizationList{self, self})
 	// authenticate self twice with different nonces
 	self2 := *self
-	self2.Nonce = helper.Nonce(selfAddr) + 1
+	self2.Nonce = helper.Nonce(addr) + 1
 	self2P, _ := types.SignAuth(&self2, sk)
-	helper.ExecAuth(selfAddr, []byte{}, &types.AuthorizationList{self, self2P})
+	helper.ExecAuth(addr, []byte{}, &types.AuthorizationList{self, self2P})
 	// unsigned authorization
-	helper.ExecAuth(selfAddr, []byte{}, &types.AuthorizationList{unsigned})
+	helper.ExecAuth(addr, []byte{}, &types.AuthorizationList{unsigned})
 	// many authorizations
 	var list types.AuthorizationList
 	for i := 0; i < 1024; i++ {
 		list = append(list, self)
 	}
-	helper.ExecAuth(selfAddr, []byte{}, &list)
+	helper.ExecAuth(addr, []byte{}, &list)
 	// too many authorizations
 	for i := 0; i < 1024*1023; i++ {
 		list = append(list, self)
 	}
-	helper.ExecAuth(selfAddr, []byte{}, &list)
+	helper.ExecAuth(addr, []byte{}, &list)
+}
+
+// See: https://gist.github.com/lightclient/7742e84fde4962f32928c6177eda7523
+func deploy7702Proxy() (common.Address, error) {
+	bytecode := "5f54808060ff1c15600e575f5ffd5b15606f57337300000000000000000000000000000000000010921415605557507f80000000000000000000000000000000000000000000000000000000000000005f555f5ff35b5f365f5f37365f345f945af45b3d5f3e5f3d91606d57fd5bf35b465f5260805f60203760405f205f5260205f60805f60015afa505f5130146094575f5ffd5b5f35805f555f608036038060805f375f345f945af1606256"
+	return helper.Deploy(bytecode)
 }
 
 func test2935() {
