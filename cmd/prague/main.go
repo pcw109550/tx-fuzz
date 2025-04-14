@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"strings"
 
 	txfuzz "github.com/MariusVanDerWijden/tx-fuzz"
 	"github.com/MariusVanDerWijden/tx-fuzz/helper"
@@ -15,26 +16,22 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/holiman/uint256"
 )
 
 func main() {
-	fmt.Println("Touching contracts")
 	testTouchContracts()
-	fmt.Println("2537")
 	test2537()
-	fmt.Println("2537")
 	test2537Long()
-	fmt.Println("3074")
 	test3074()
-	fmt.Println("7702")
 	test7702()
-	fmt.Println("2935")
 	test2935()
 	test7002()
 	test7251()
 }
 
 func testTouchContracts() {
+	fmt.Println("Touching contracts")
 	// touch beacon root addr
 	addresses := []common.Address{
 		common.HexToAddress("0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02"), // beacon roots
@@ -46,16 +43,19 @@ func testTouchContracts() {
 		common.HexToAddress("0x4242424242424242424242424242424242424242"), // testnet deposit address
 	}
 
+	var last *types.Transaction
 	for _, addr := range addresses {
 		helper.Exec(addr, []byte{}, false)                       // no data
 		helper.Exec(addr, []byte{1}, false)                      // 1 byte of data
 		helper.Exec(addr, crypto.Keccak256([]byte{1})[:], false) // 32 bytes of data
 		helper.Exec(addr, make([]byte, 20), false)
-		helper.Exec(addr, make([]byte, 2048), false) // 2048 bytes of data
+		last = helper.Exec(addr, make([]byte, 2048), false) // 2048 bytes of data
 	}
+	helper.Wait(last)
 }
 
 func test3074() {
+	fmt.Println("EIP-3074")
 	// auth
 	helper.Execute([]byte{0x5f, 0x5f, 0x5f, 0xf6, 0x80, 0x55}, 200000)
 	helper.Execute([]byte{0x64, 0xff, 0xff, 0xff, 0xff, 0x64, 0xff, 0xff, 0xff, 0xff, 0x64, 0xff, 0xff, 0xff, 0xff, 0xf6, 0x80, 0x55}, 200000)
@@ -77,6 +77,7 @@ func test3074() {
 }
 
 func test2537() {
+	fmt.Println("EIP-2537")
 	vectors := [][]byte{
 		{},
 		{0x5f},             // small input
@@ -100,6 +101,7 @@ func test2537() {
 		common.FromHex("0000000000000000000000000000000017f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb0000000000000000000000000000000008b3f481e3aaa0f1a09e30ed741d8ae4fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e100000000000000000000000000000000197bfd0342bbc8bee2beced2f173e1a87be576379b343e93232d6cef98d84b1d696e5612ff283ce2cfdccb2cfb65fa0c00000000000000000000000000000000184e811f55e6f9d84d77d2f79102fd7ea7422f4759df5bf7f6331d550245e3f1bcf6a30e3b29110d85e0ca16f9f6ae7a000000000000000000000000000000000f10e1eb3c1e53d2ad9cf2d398b2dc22c5842fab0a74b174f691a7e914975da3564d835cd7d2982815b8ac57f507348f000000000000000000000000000000000767d1c453890f1b9110fda82f5815c27281aba3f026ee868e4176a0654feea41a96575e0c4d58a14dbfbcc05b5010b10000000000000000000000000000000017f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb0000000000000000000000000000000008b3f481e3aaa0f1a09e30ed741d8ae4fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e100000000000000000000000000000000024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb80000000000000000000000000000000013e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e000000000000000000000000000000000d1b3cc2c7027888be51d9ef691d77bcb679afda66c73f17f9ee3837a55024f78c71363275a75d75d86bab79f74782aa0000000000000000000000000000000013fa4d4a0ad8b1ce186ed5061789213d993923066dddaf1040bc3ff59f825c78df74f2d75467e25e0f55f8a00fa030ed"),
 	}
 	for i := 0xa; i < 0x14; i++ {
+		fmt.Printf("2537_precompile: %v\n", i)
 		for _, vec := range vectors {
 			testBLS(i, vec)
 		}
@@ -119,6 +121,11 @@ func test7002() {
 		// input data is pubkey(48) || amount(8)
 		common.FromHex("b917cfdc0d25b72d55cf94db328e1629b7f4fde2c30cdacf873b664416f76a0c7f7cc50c9f72a3cb84be88144cde91250000000000000d80"),
 		common.FromHex("b9812f7d0b1f2f969b52bbb2d316b0c2fa7c9dba85c428c5e6c27766bcc4b0c6e874702ff1eb1c7024b08524a977160100000000000f423f"),
+		common.FromHex("b9812f7d0b1f2f969b52bbb2d316b0c2fa7c9dba85c428c5e6c27766bcc4b0c6e874702ff1eb1c7024b08524a9771601ffffffffffffffff"),
+		common.FromHex("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		common.FromHex("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000d80"),
+		common.FromHex("b917cfdc0d25b72d55cf94db328e1629b7f4fde2c30cdacf873b664416f76a0c7f7cc50c9f72a3cb84be88144cde91250000000000000d80ff"),
+		common.FromHex("b917cfdc0d25b72d55cf94db328e1629b7f4fde2c30cdacf873b664416f76a0c7f7cc50c9f72a3cb84be88144cde91250000000000000d"),
 	}
 	for i, data := range inputs {
 		tx := makeTxWithValue(contract, value, data)
@@ -142,13 +149,20 @@ func test7251() {
 	inputs := [][]byte{
 		// input data is source_blskey(48) || target_blskey(48)
 		common.FromHex("b917cfdc0d25b72d55cf94db328e1629b7f4fde2c30cdacf873b664416f76a0c7f7cc50c9f72a3cb84be88144cde9125b9812f7d0b1f2f969b52bbb2d316b0c2fa7c9dba85c428c5e6c27766bcc4b0c6e874702ff1eb1c7024b08524a9771601"),
+		common.FromHex("b9812f7d0b1f2f969b52bbb2d316b0c2fa7c9dba85c428c5e6c27766bcc4b0c6e874702ff1eb1c7024b08524a9771601b917cfdc0d25b72d55cf94db328e1629b7f4fde2c30cdacf873b664416f76a0c7f7cc50c9f72a3cb84be88144cde9125"),
+		common.FromHex("b917cfdc0d25b72d55cf94db328e1629b7f4fde2c30cdacf873b664416f76a0c7f7cc50c9f72a3cb84be88144cde9125000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		common.FromHex("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b9812f7d0b1f2f969b52bbb2d316b0c2fa7c9dba85c428c5e6c27766bcc4b0c6e874702ff1eb1c7024b08524a9771601"),
+		common.FromHex("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		common.FromHex("b917cfdc0d25b72d55cf94db328e1629b7f4fde2c30cdacf873b664416f76a0c7f7cc50c9f72a3cb84be88144cde9125b9812f7d0b1f2f969b52bbb2d316b0c2fa7c9dba85c428c5e6c27766bcc4b0c6e874702ff1eb1c7024b08524a9771601ff"),
+		common.FromHex("b917cfdc0d25b72d55cf94db328e1629b7f4fde2c30cdacf873b664416f76a0c7f7cc50c9f72a3cb84be88144cde9125b9812f7d0b1f2f969b52bbb2d316b0c2fa7c9dba85c428c5e6c27766bcc4b0c6e874702ff1eb1c7024b08524a97716"),
 	}
 	for _, data := range inputs {
-		helper.Exec(contract, data, false)
+		helper.Wait(helper.Exec(contract, data, false))
 	}
 }
 
 func test2537Long() {
+	fmt.Println("EIP-2537_long")
 	multiexpG1 := common.FromHex("00000000000000000000000000000000024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb80000000000000000000000000000000013e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e000000000000000000000000000000000ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801000000000000000000000000000000000606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be00000000000000000000000000000000024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb80000000000000000000000000000000013e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e000000000000000000000000000000000ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801000000000000000000000000000000000606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be")
 	testLongBLS(0x0d, multiexpG1)
 	multiexpG2 := common.FromHex("000000000000000000000000000000000572cbea904d67468808c8eb50a9450c9721db309128012543902d0ac358a62ae28f75bb8f1c7c42c39a8c5529bf0f4e00000000000000000000000000000000166a9d8cabc673a322fda673779d8e3822ba3ecb8670e461f73bb9021d5fd76a4c56d9d4cd16bd1bba86881979749d2800000000000000000000000000000000122915c824a0857e2ee414a3dccb23ae691ae54329781315a0c75df1c04d6d7a50a030fc866f09d516020ef82324afae0000000000000000000000000000000009380275bbc8e5dcea7dc4dd7e0550ff2ac480905396eda55062650f8d251c96eb480673937cc6d9d6a44aaa56ca66dc000000000000000000000000000000000b21da7955969e61010c7a1abc1a6f0136961d1e3b20b1a7326ac738fef5c721479dfd948b52fdf2455e44813ecfd8920000000000000000000000000000000008f239ba329b3967fe48d718a36cfe5f62a7e42e0bf1c1ed714150a166bfbd6bcf6b3b58b975b9edea56d53f23a0e8490000000000000000000000000000000006e82f6da4520f85c5d27d8f329eccfa05944fd1096b20734c894966d12a9e2a9a9744529d7212d33883113a0cadb9090000000000000000000000000000000017d81038f7d60bee9110d9c0d6d1102fe2d998c957f28e31ec284cc04134df8e47e8f82ff3af2e60a6d9688a4563477c00000000000000000000000000000000024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb80000000000000000000000000000000013e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e000000000000000000000000000000000d1b3cc2c7027888be51d9ef691d77bcb679afda66c73f17f9ee3837a55024f78c71363275a75d75d86bab79f74782aa0000000000000000000000000000000013fa4d4a0ad8b1ce186ed5061789213d993923066dddaf1040bc3ff59f825c78df74f2d75467e25e0f55f8a00fa030ed")
@@ -238,6 +252,7 @@ func makeTxWithValue(addr common.Address, value *big.Int, data []byte) *types.Tr
 }
 
 func test7702() {
+	fmt.Println("EIP-7702")
 	proxy, err := deploy7702Proxy()
 	if err != nil {
 		panic(err)
@@ -251,57 +266,71 @@ func test7702() {
 		if err != nil {
 			panic(err)
 		}
-		unsigned := &types.Authorization{
-			ChainID: helper.ChainID().Uint64(),
+		unsigned := types.SetCodeAuthorization{
+			ChainID: *uint256.MustFromBig(helper.ChainID()),
 			Address: selfAddr,
 			Nonce:   helper.Nonce(selfAddr),
 		}
 		sk := crypto.ToECDSAUnsafe(common.FromHex(txfuzz.SK))
-		self, _ := types.SignAuth(unsigned, sk)
-		helper.ExecAuth(prec, []byte{0x01}, &types.AuthorizationList{self})
+		self, _ := types.SignSetCode(sk, unsigned)
+		helper.Wait(helper.ExecAuth(prec, []byte{0x01}, []types.SetCodeAuthorization{self}))
 	}
+	// Clear the authorization
+	empty := types.SetCodeAuthorization{
+		ChainID: *uint256.MustFromBig(helper.ChainID()),
+		Address: common.Address{},
+		Nonce:   helper.Nonce(selfAddr),
+	}
+	sk := crypto.ToECDSAUnsafe(common.FromHex(txfuzz.SK))
+	emptyAuth, _ := types.SignSetCode(sk, empty)
+	helper.Wait(helper.ExecAuth(selfAddr, []byte{}, []types.SetCodeAuthorization{emptyAuth}))
 }
 
 func do7702Calls(addr common.Address) {
 	// authenticate self
 	selfAddr := common.HexToAddress(txfuzz.ADDR)
-	unsigned := &types.Authorization{
-		ChainID: helper.ChainID().Uint64(),
+	unsigned := types.SetCodeAuthorization{
+		ChainID: *uint256.MustFromBig(helper.ChainID()),
 		Address: selfAddr,
 		Nonce:   helper.Nonce(selfAddr),
 	}
 	sk := crypto.ToECDSAUnsafe(common.FromHex(txfuzz.SK))
-	self, _ := types.SignAuth(unsigned, sk)
-	helper.ExecAuth(addr, []byte{}, &types.AuthorizationList{self})
+	self, _ := types.SignSetCode(sk, unsigned)
+	helper.Wait(helper.ExecAuth(addr, []byte{}, []types.SetCodeAuthorization{self}))
 	// authenticate self twice
-	helper.ExecAuth(addr, []byte{}, &types.AuthorizationList{self, self})
+	helper.Wait(helper.ExecAuth(addr, []byte{}, []types.SetCodeAuthorization{self, self}))
 	// authenticate self twice with different nonces
-	self2 := *self
+	self2 := self
 	self2.Nonce = helper.Nonce(addr) + 1
-	self2P, _ := types.SignAuth(&self2, sk)
-	helper.ExecAuth(addr, []byte{}, &types.AuthorizationList{self, self2P})
+	self2P, _ := types.SignSetCode(sk, self2)
+	helper.Wait(helper.ExecAuth(addr, []byte{}, []types.SetCodeAuthorization{self, self2P}))
 	// unsigned authorization
-	helper.ExecAuth(addr, []byte{}, &types.AuthorizationList{unsigned})
+	helper.Wait(helper.ExecAuth(addr, []byte{}, []types.SetCodeAuthorization{unsigned}))
 	// many authorizations
-	var list types.AuthorizationList
+	var list []types.SetCodeAuthorization
 	for i := 0; i < 1024; i++ {
 		list = append(list, self)
 	}
-	helper.ExecAuth(addr, []byte{}, &list)
+	helper.Wait(helper.ExecAuth(addr, []byte{}, list))
 	// too many authorizations
 	for i := 0; i < 1024*1023; i++ {
 		list = append(list, self)
 	}
-	helper.ExecAuth(addr, []byte{}, &list)
+	helper.ExecAuth(addr, []byte{}, list)
 }
 
-// See: https://gist.github.com/lightclient/7742e84fde4962f32928c6177eda7523
 func deploy7702Proxy() (common.Address, error) {
-	bytecode := "5f54808060ff1c15600e575f5ffd5b15606f57337300000000000000000000000000000000000010921415605557507f80000000000000000000000000000000000000000000000000000000000000005f555f5ff35b5f365f5f37365f345f945af45b3d5f3e5f3d91606d57fd5bf35b465f5260805f60203760405f205f5260205f60805f60015afa505f5130146094575f5ffd5b5f35805f555f608036038060805f375f345f945af1606256"
-	return helper.Deploy(bytecode)
+	// See: https://raw.githubusercontent.com/ethereum/hive/refs/heads/master/cmd/hivechain/contracts/deployer.eas
+	deployer := "600d380380600d6000396000f3"
+	// See: https://gist.github.com/lightclient/7742e84fde4962f32928c6177eda7523
+	bytecode := "5f54808060ff1c15600e575f5ffd5b15606f57337300000000000000000000000000000000000010921415605557507f80000000000000000000000000000000000000000000000000000000000000005f555f5ff35b5f365f5f37365f345f945af45b3d5f3e5f3d91606d57fd5bf35b465f5260805f60203760405f205f5260205f60805f737a40026a3b9a41754a95eec8c92c6b99886f440c5afa505f51301460a7575f5ffd5b5f35805f555f608036038060805f375f345f945af1606256"
+	// replace placeholder address
+	bytecode = strings.Replace(bytecode, "0x7a40026A3b9A41754a95EeC8c92C6B99886f440C", txfuzz.ADDR, 1)
+	return helper.Deploy(fmt.Sprintf("%v%v", deployer, bytecode))
 }
 
 func test2935() {
+	fmt.Println("EIP-2935")
 	contr, err := deploy2935Caller()
 	if err != nil {
 		panic(err)
